@@ -1,0 +1,49 @@
+//Distance reading with sensor HC-SR04
+//Alert with Groove Vibration Motor
+#include <Ultrasonic.h>
+
+ Ultrasonic ultrassom(7,8); // digital pins for trig(7) and echo (8)
+long distancia;
+int MoPin = 9; //Vibration motor
+
+
+ void setup() {
+ Serial.begin(9600); 
+ pinMode( MoPin, OUTPUT ); 
+ }
+ 
+void Ultrasonic()
+{
+   distancia = ultrassom.Ranging(CM);
+   // safety distance rear/front is >= 60cm
+
+  if (distancia >= 60 ) {
+     Serial.print("Safe Distance ");
+     Serial.print(distancia);
+     Serial.println(" cm");
+
+  }
+  else {
+    
+    Serial.print("Unsafe Distance ");
+    Serial.print(distancia);
+    Serial.println(" cm");
+    delay(500);
+      digitalWrite(MoPin, HIGH);
+    delay(300);
+     digitalWrite(MoPin, LOW);
+    delay(5000);
+    
+ }
+  
+  }
+ void loop()
+ {
+
+  Ultrasonic();
+   delay(500);
+
+
+   
+}
+
