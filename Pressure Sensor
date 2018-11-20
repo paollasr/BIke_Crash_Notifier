@@ -1,0 +1,49 @@
+
+
+class PressureSensor{
+  
+  
+int fsrPin;
+int fsrReading;
+int fsrVoltage;
+
+
+  public: 
+  PressureSensor(int fsrPin)
+{
+  pinMode(fsrPin, OUTPUT);
+  
+ }
+  
+ void UpdatePressure(){
+
+  fsrReading = analogRead(fsrPin);
+  Serial.print("Analog Reading: ");
+  Serial.println(fsrReading);
+
+  fsrVoltage = map(fsrReading, 0, 1023, 0, 5000); //5000mV=5V
+  Serial.print("Voltage Reading (mV): ");
+  Serial.println(fsrVoltage);
+
+  if (fsrVoltage > 4500 ) {
+    Serial.print("Rider is present!");
+    }
+    else {
+    Serial.print("Rider is NOT present. ");
+       }
+  delay (10000); //1min
+  }
+  
+  };
+
+//pin analog 0 for FSR sensor
+
+  PressureSensor pressure(0);
+  
+void setup() {
+Serial.begin(9600);
+}
+
+void loop() {
+ pressure.UpdatePressure();
+}
