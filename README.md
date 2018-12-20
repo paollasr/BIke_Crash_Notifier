@@ -7,9 +7,14 @@ Reading from different sensors will identify whether a bike crash/Accident occur
 
 
 Libraries
-Accelerometer LSM6DS3 - Free Fall Sensor
+HC-SR04 (Distance Sensor)
+Martin Sosic - https://github.com/Martinsos/arduino-lib-hc-sr04/blob/master/examples/simple/simple.ino
+
+SparkFunLSM6DS3 (Accelerometer - Free Fall Detection)
 https://github.com/Seeed-Studio/Accelerometer_And_Gyroscope_LSM6DS3
 
+FSR400 (Force Sensitive Resistor)
+--> Goto code
 
 Adafruit_LIS3DH - Displacement/Vibration Sensor
 https://github.com/adafruit/Adafruit_LIS3DH
