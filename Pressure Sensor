@@ -1,49 +1,47 @@
 
-
-class PressureSensor{
-  
-  
-int fsrPin;
+const int pressureSensor = A0;
 int fsrReading;
-int fsrVoltage;
+int LEDpin= 13;
 
-
-  public: 
-  PressureSensor(int fsrPin)
-{
-  pinMode(fsrPin, OUTPUT);
-  
- }
-  
- void UpdatePressure(){
-
-  fsrReading = analogRead(fsrPin);
-  Serial.print("Analog Reading: ");
-  Serial.println(fsrReading);
-
-  fsrVoltage = map(fsrReading, 0, 1023, 0, 5000); //5000mV=5V
-  Serial.print("Voltage Reading (mV): ");
-  Serial.println(fsrVoltage);
-
-  if (fsrVoltage > 4500 ) {
-    Serial.print("Rider is present!");
-    }
-    else {
-    Serial.print("Rider is NOT present. ");
-       }
-  delay (10000); //1min
-  }
-  
-  };
-
-//pin analog 0 for FSR sensor
-
-  PressureSensor pressure(0);
-  
+ 
 void setup() {
 Serial.begin(9600);
+pinMode(LEDpin, OUTPUT);
+
+}
+
+
+bool isRiderPresent(void) {
+  fsrReading = analogRead(pressureSensor);       //Read and save analog value from potentiometer
+  fsrReading = map(fsrReading, 0, 1023, 0, 255);
+  
+  if ( fsrReading > 1 )  {
+    Serial.println(fsrReading);
+    
+    return true;
+    
+  } else{
+    return false;
+  }
+ 
 }
 
 void loop() {
- pressure.UpdatePressure();
+      
+  if ( isRiderPresent() )  {
+     Serial.println("Rider present");
+     digitalWrite(LEDpin, HIGH);
+     delay(100);
+  }
+  else{
+     Serial.println("no rider");
+     digitalWrite(LEDpin, LOW);
+     delay(100);
+  }
+ delay(1000);  //  Evaluate every 10 secs
 }
+
+ 
+
+
+  
