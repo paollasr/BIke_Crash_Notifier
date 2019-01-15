@@ -44,11 +44,11 @@ int config_free_fall_detect(void)
 /*
  Ultrasonic distance Sensor settings
 */
-UltraSonicDistanceSensor distanceSensor(8, 9); //Trigger aand Echo Pins
-bool range = false;
+UltraSonicDistanceSensor distanceSensor(9, 8); //Trigger aand Echo Pins
+bool range;
 const long minRange = 3;      // starts from 3cm since zero is measurement error
 const long maxRange = 60;     // Below maxRange means unsafe distance
-
+int buzzerFreq; // Buzzer Alert
 /*
  Leds 
 */
@@ -59,6 +59,12 @@ const long maxRange = 60;     // Below maxRange means unsafe distance
 void setup() {
   loraSerial.begin(57600);
   debugSerial.begin(9600);
+
+  //Setting LED Pins as output
+ pinMode(LED_RED, OUTPUT);
+ pinMode(LED_BLUE, OUTPUT);
+ //Buzzer Pin
+ pinMode(11,OUTPUT);
 
   while (!debugSerial && millis() < 5000); // 5s for Serial Monitor
 
@@ -84,9 +90,7 @@ void setup() {
  //TTN Downlink method
  ttn.onMessage(downlinkLED);
 
- //Setting LED Pins as output
- pinMode(LED_RED, OUTPUT);
- pinMode(LED_BLUE, OUTPUT);
+
 }
 
 /*
@@ -95,21 +99,21 @@ void setup() {
 uint8_t senseDistance(void) {
 uint16_t distance = distanceSensor.measureDistanceCm();
 
-  if ( distance < 2 || distance > 2000 )      // Error Range
+ if ( distance < 2 || distance > 2000 )      // Error Range
     distance = 0;                            // 0  indicates an error
   else if ( distance > 255 )
     distance = 255;                          // Measurements higher than 255cm  are pruned to 255 in order to fit in 1Byte
 
-  if (distance > minRange || distance < maxRange ){
+  if (distance > minRange && distance < maxRange ){
 
     range= true;
-    Serial.print("UNSAFE dist (cm): ");
+    Serial.print("ALERT! Object is too close to rear wheel (cm): ");
     Serial.println(distance);
     }  
-    else (distance > maxRange);
+    else
     {
-      range= false;
-      Serial.print("Safe distance");
+      range = false;
+      Serial.println("Safe distance from rear side");
   }
   return distance;
 }
@@ -117,8 +121,8 @@ uint16_t distance = distanceSensor.measureDistanceCm();
 /*
    Measure free falls
 */
-
-uint16_t Freefallcounter(void)
+uint16_t Freefallcounter(bool)
+//uint16_t Freefallcounter(void)
  {
   uint8_t readDataByte = 0;
   //Read the wake-up source register
@@ -126,15 +130,24 @@ uint16_t Freefallcounter(void)
   //Mask off the FF_IA bit for free-fall detection
   readDataByte &= 0x20;
   //checking the free fall 
-  if( readDataByte )
+  if( readDataByte && RiderPresent()== true )
   {   
     detectCount ++;
     Serial.print("FALL DETECTED!");      
     Serial.println(detectCount);
-    digitalWrite(LED_RED, HIGH);  
-    return error;  
+    digitalWrite(LED_RED, HIGH);
+    buzzerFreq=2000;
+
+  //tone(pin, frequency, duration)
+  tone(11,buzzerFreq, 100);
+    
+    //return error; 
+      return true;   
   }else{
-    digitalWrite(LED_RED, LOW);}
+     digitalWrite(LED_RED, LOW);
+     noTone(11);
+     return false;  
+    }
 
   delay(10);
   }
@@ -142,7 +155,7 @@ uint16_t Freefallcounter(void)
 /*
   Pressure Sensor - Is rider Present?
 */
-const int pressureSensor = A0;
+const int pressureSensor = A3;
 int fsrReading;
 
 bool RiderPresent(void) {
@@ -168,13 +181,13 @@ bool mustWeSendData(uint16_t f, uint8_t d ) {
   1           0       TRUE
   1           1       TRUE
 */
-  if(detectCount++ || range == false){
+  if( Freefallcounter(true) || range == false){
       return true;
       }else{
       return false;
       }
   
-  if(detectCount++ && range == true){
+  if( Freefallcounter(true) && range == true) {
       return true;
       }else{
       return false;
@@ -193,25 +206,40 @@ void sendLoRaData(uint16_t f, uint8_t d ) {
 }
 
 
+
+
 /*
   Sending Data to LoRa Server
 */
-      uint16_t falls = Freefallcounter();
+      uint16_t falls = Freefallcounter(true);
       uint8_t distance = senseDistance();
  
 void loop() {
-  delay(10 * 1000);       //  Evaluate every 10 secs
-  if ( RiderPresent() )  {
+
+  if (RiderPresent() == true )  {
       
     if ( mustWeSendData(falls, distance) )  {
       // Send to backend via LoRa
       sendLoRaData(falls, distance);
+    
+       buzzerFreq=4000;
+       //tone(pin, frequency, duration)
+      tone(11,buzzerFreq, 100);
+      Serial.println("Oops, accident detected!");
+      digitalWrite(LED_BLUE, HIGH);
       
-     }
-  }
+     }else{
+   digitalWrite(LED_BLUE, LOW);
+   Serial.println("No accident detected");   
+   noTone(11);
+      }
+  }  delay(10 * 1000);       //  Evaluate every 10 secs
 }
 
-//DownlinkLED function - Light up the blue LED whenever data is sent to LoRa backend
+/*
+  Receiving ACK data was sent to Lora Backend
+*/
+
 void downlinkLED(const uint16_t *payload, size_t size, port_t port){
   
   if (payload == (mustWeSendData(falls, distance)== true) ){
@@ -220,5 +248,6 @@ void downlinkLED(const uint16_t *payload, size_t size, port_t port){
     digitalWrite(LED_BLUE, LOW);
       }
 
- debugSerial.print("Received " + String(size) + " bytes on port " + String(port) + ":");
+ Serial.print("Received " + String(size) + " bytes on port " + String(port) + ":");
 }
+
