@@ -70,23 +70,23 @@ uint16_t Freefallcounter(bool)
   lsm6ds3.readRegister(&readDataByte, LSM6DS3_ACC_GYRO_WAKE_UP_SRC);
   //Mask off the FF_IA bit for free-fall detection
   readDataByte &= 0x20;
-  //checking the free fall 
-  if( readDataByte )
+
+  //checking the free fall AND riders presence
+  if( readDataByte && RiderPresent()== true )
   {   
     detectCount ++;
     Serial.print("FALL DETECTED!");      
     Serial.println(detectCount);
-    digitalWrite(LED_RED, HIGH);  
+   
     //return error;
     return true;  
   }else{
-    digitalWrite(LED_RED, LOW);
+    
     return false;
-    }
+    }  
 
-  delay(10);
-  }
-
+  delay(1000);
+ }
 /*
   Pressure Sensor - Is rider Present?
 */
@@ -99,9 +99,11 @@ bool RiderPresent(void) {
   if ( fsrReading > 1 )  {
     Serial.print("Rider is present ");
     Serial.println(fsrReading);
+     digitalWrite(LED_RED, HIGH);  
     return true;
   } else{
     Serial.println("No rider");
+    digitalWrite(LED_RED, LOW);
     return false;
   }
 }
@@ -129,28 +131,28 @@ uint16_t distance = distanceSensor.measureDistanceCm();
 }
 
 void loop() {
-
-if ( RiderPresent() == true && Freefallcounter(true) ){
-
-   
-   //Freefallcounter();
-   senseDistance();
-if (range == true){
-  buzzerFreq=2000;
-
-  //tone(pin, frequency, duration)
-  tone(11,buzzerFreq, 100);
-  }
-   
-   digitalWrite(LED_BLUE, HIGH);
-    }
     
-    else{
-   digitalWrite(LED_BLUE, LOW);
-   Serial.println("No accident detected");
-     //
-      noTone(11);
-      }
+    RiderPresent();
+    
+    if(Freefallcounter(true)){
+       senseDistance();
+       buzzerFreq=4000;
+       //tone(pin, frequency, duration)
+  tone(11,buzzerFreq, 100);
+  Serial.println("Oops, accident detected!");
+  digitalWrite(LED_BLUE, HIGH);
+      
+      }else{
 
-      delay(1000);       //  Evaluate every 1 secs
+   digitalWrite(LED_BLUE, LOW);
+   Serial.println("No accident detected");   
+   noTone(11);
+        
+        }
+  
+  delay(1000);       //  Evaluate every 1 secs  
   }
+      
+
+      
+  
