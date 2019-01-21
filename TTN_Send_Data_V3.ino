@@ -5,8 +5,8 @@
 
 
 // OTTA LoRa mode
-const char *appEui = "70B3D57ED0016C3A";
-const char *appKey = "992811CCD9FEBCDF79C5DD874A4BA251";
+const char *appEui = "TBD";
+const char *appKey = "TBD";
 
 #define loraSerial Serial1
 #define debugSerial Serial
