@@ -5,8 +5,8 @@
 
 
 // OTTA LoRa mode
-const char *appEui = "70B3D57ED001139E";
-const char *appKey = "D9BD1B83A358893A91B8598C671CF805";
+const char *appEui = "70B3D57ED0016C3A";
+const char *appKey = "992811CCD9FEBCDF79C5DD874A4BA251";
 
 #define loraSerial Serial1
 #define debugSerial Serial
@@ -23,21 +23,23 @@ Pins (Arduino Uno A4 A5) (Arduino Leonardo SDA SCL)
 
 LSM6DS3 lsm6ds3( I2C_MODE, 0x6A );  //I2C device address 0x6A
 uint16_t detectCount = 0;
-uint8_t error = 0;  
+uint8_t error = 0; // accumulation variable 
 uint8_t dataToWrite = 0; 
 int config_free_fall_detect(void)
 {  
  
-  dataToWrite |= LSM6DS3_ACC_GYRO_BW_XL_200Hz;
-  dataToWrite |= LSM6DS3_ACC_GYRO_FS_XL_2g;
-  dataToWrite |= LSM6DS3_ACC_GYRO_ODR_XL_416Hz;
-  
-  error += lsm6ds3.writeRegister(LSM6DS3_ACC_GYRO_CTRL1_XL, dataToWrite);
-  error += lsm6ds3.writeRegister( LSM6DS3_ACC_GYRO_WAKE_UP_DUR, 0x00 );
+  dataToWrite |= LSM6DS3_ACC_GYRO_BW_XL_200Hz; //Anti-aliasing filter bandwidth selected = 200hz
+  dataToWrite |= LSM6DS3_ACC_GYRO_FS_XL_2g; //Accelerometer full-scale selected = 2g
+  dataToWrite |= LSM6DS3_ACC_GYRO_ODR_XL_416Hz; // Output data rate and power mode = 416hz high performance
+
+  //Writing the accumulated data in the error accumulation variable
+  error += lsm6ds3.writeRegister(LSM6DS3_ACC_GYRO_CTRL1_XL, dataToWrite); //REGISTER 1 = Linear acceleration sensor control 
+  //Write 00h into WAKE_UP_DUR
+  error += lsm6ds3.writeRegister( LSM6DS3_ACC_GYRO_WAKE_UP_DUR, 0x00 );//(pag 80) Free-fall, wakeup, timestamp and sleep mode functions duration setting register 
   error += lsm6ds3.writeRegister(LSM6DS3_ACC_GYRO_FREE_FALL, 0x33); //writes 33h into free fall
   error += lsm6ds3.writeRegister( LSM6DS3_ACC_GYRO_MD1_CFG, 0x10 );//writes 10h into MD1 and MD2
   error += lsm6ds3.writeRegister( LSM6DS3_ACC_GYRO_MD2_CFG, 0x10 );
-  error += lsm6ds3.writeRegister(LSM6DS3_ACC_GYRO_TAP_CFG1, 0x01);//latch interrupt
+  error += lsm6ds3.writeRegister(LSM6DS3_ACC_GYRO_TAP_CFG1, 0x01);//latch interrupt and writes 01h into TAP_CFG1 
 }
 
 
@@ -47,24 +49,18 @@ int config_free_fall_detect(void)
 UltraSonicDistanceSensor distanceSensor(9, 8); //Trigger aand Echo Pins
 bool range;
 const long minRange = 3;      // starts from 3cm since zero is measurement error
-const long maxRange = 60;     // Below maxRange means unsafe distance
-int buzzerFreq; // Buzzer Alert
+const long maxRange = 70;     // Below maxRange means unsafe distance
+
 /*
  Leds 
 */
 #define LED_RED 10 //LED light up everytime fall is detected on a bike
-#define LED_BLUE 11 //LED light up everytime a message is sent to LoRa backend
-
+#define LED_BLUE 12 //LED light up everytime a message is sent to LoRa backend
+int buzzerFreq;
 
 void setup() {
   loraSerial.begin(57600);
   debugSerial.begin(9600);
-
-  //Setting LED Pins as output
- pinMode(LED_RED, OUTPUT);
- pinMode(LED_BLUE, OUTPUT);
- //Buzzer Pin
- pinMode(11,OUTPUT);
 
   while (!debugSerial && millis() < 5000); // 5s for Serial Monitor
 
@@ -90,29 +86,33 @@ void setup() {
  //TTN Downlink method
  ttn.onMessage(downlinkLED);
 
-
+ //Setting LED Pins as output
+ pinMode(LED_RED, OUTPUT);
+ pinMode(LED_BLUE, OUTPUT);
+ //buzzer Pin
+ pinMode(11,OUTPUT);
 }
 
 /*
-   Distance Validator
+   Distance Sensor
 */
 uint8_t senseDistance(void) {
 uint16_t distance = distanceSensor.measureDistanceCm();
 
- if ( distance < 2 || distance > 2000 )      // Error Range
+  if ( distance < 2 || distance > 2000 )      // Error Range
     distance = 0;                            // 0  indicates an error
   else if ( distance > 255 )
     distance = 255;                          // Measurements higher than 255cm  are pruned to 255 in order to fit in 1Byte
 
-  if (distance > minRange && distance < maxRange ){
+  if (distance > minRange || distance < maxRange ){
 
     range= true;
     Serial.print("ALERT! Object is too close to rear wheel (cm): ");
     Serial.println(distance);
     }  
-    else
+    else (distance > maxRange);
     {
-      range = false;
+      range= false;
       Serial.println("Safe distance from rear side");
   }
   return distance;
@@ -121,36 +121,37 @@ uint16_t distance = distanceSensor.measureDistanceCm();
 /*
    Measure free falls
 */
-uint16_t Freefallcounter(bool)
+
 //uint16_t Freefallcounter(void)
- {
+uint16_t Freefallcounter(bool){
+  
   uint8_t readDataByte = 0;
   //Read the wake-up source register
   lsm6ds3.readRegister(&readDataByte, LSM6DS3_ACC_GYRO_WAKE_UP_SRC);
   //Mask off the FF_IA bit for free-fall detection
-  readDataByte &= 0x20;
+  readDataByte &= 0x20; //dataByte= dataByte & 0x20
   //checking the free fall 
-  if( readDataByte && RiderPresent()== true )
-  {   
+  if( readDataByte && RiderPresent()==true) {   
     detectCount ++;
     Serial.print("FALL DETECTED!");      
     Serial.println(detectCount);
-    digitalWrite(LED_RED, HIGH);
+    digitalWrite(LED_RED, HIGH);  
+    //return error; 
+    return true;
     buzzerFreq=2000;
 
   //tone(pin, frequency, duration)
   tone(11,buzzerFreq, 100);
-    
-    //return error; 
-      return true;   
-  }else{
-     digitalWrite(LED_RED, LOW);
-     noTone(11);
-     return false;  
-    }
 
-  delay(10);
-  }
+     
+     }else{
+    digitalWrite(LED_RED, LOW);
+     noTone(11);
+     return false; 
+      }
+       delay(10);
+ }
+
 
 /*
   Pressure Sensor - Is rider Present?
@@ -172,7 +173,7 @@ bool RiderPresent(void) {
 /*
 Evaluating conditions when data must be sent to LoRa
 */
-bool mustWeSendData(uint16_t f, uint8_t d ) {
+bool mustWeSendData(uint16_t f, uint8_t d, uint8_t p ) {
  /*
   evaluatiing sensor conditions
   FreeFall X Distance
@@ -181,7 +182,7 @@ bool mustWeSendData(uint16_t f, uint8_t d ) {
   1           0       TRUE
   1           1       TRUE
 */
-  if( Freefallcounter(true) || range == false){
+   if( Freefallcounter(true) || range == false){
       return true;
       }else{
       return false;
@@ -196,16 +197,31 @@ bool mustWeSendData(uint16_t f, uint8_t d ) {
 /*
   Bytes to be sent
 */
-void sendLoRaData(uint16_t f, uint8_t d ) {
-  byte bytesToSend[3];      //  2 bytes for Accelerometer / 1 byte distance sensor;
+void sendLoRaData(uint16_t f, uint8_t d, uint8_t p ) {
+
+// Wake RN2483
+  ttn.wake();
+  
+  byte bytesToSend[4];      //  2 bytes for Accelerometer / 1 byte distance sensor;
 
   bytesToSend[0] = d;       // Distance Byte
   bytesToSend[1] = f >> 8;  // High byte Accelerometer
   bytesToSend[2] = f;       // Low Byte Accelerometer
+  bytesToSend[3] = p;       //Rider is present
+  
   ttn.sendBytes(bytesToSend, sizeof(bytesToSend), 2 ); /*bytes,size, port */
+
+
+
+  // Set RN2483 to sleep mode
+  ttn.sleep(60000);
+
+  // This one is not optionnal, remove it
+  // and say bye bye to RN2983 sleep mode
+  delay(50);
+
+
 }
-
-
 
 
 /*
@@ -213,41 +229,38 @@ void sendLoRaData(uint16_t f, uint8_t d ) {
 */
       uint16_t falls = Freefallcounter(true);
       uint8_t distance = senseDistance();
+      uint8_t presence = RiderPresent();
  
 void loop() {
-
-  if (RiderPresent() == true )  {
+  
+  if ( RiderPresent() == true )  {
       
-    if ( mustWeSendData(falls, distance) )  {
+    if ( mustWeSendData(falls, distance, presence) )  {
       // Send to backend via LoRa
-      sendLoRaData(falls, distance);
-    
+      sendLoRaData(falls, distance, presence);
        buzzerFreq=4000;
        //tone(pin, frequency, duration)
       tone(11,buzzerFreq, 100);
       Serial.println("Oops, accident detected!");
-      digitalWrite(LED_BLUE, HIGH);
-      
      }else{
-   digitalWrite(LED_BLUE, LOW);
-   Serial.println("No accident detected");   
-   noTone(11);
+      Serial.println("All good in the hood :) No accident detected.");
       }
-  }  delay(10 * 1000);       //  Evaluate every 10 secs
+  }
+
+void  sendLoRaData (uint16_t f, uint8_t d );
+  
+  delay(10 * 1000);       //  Evaluate every 10 secs
 }
 
-/*
-  Receiving ACK data was sent to Lora Backend
-*/
+//DownlinkLED function - Light up the blue LED whenever data is sent to LoRa backend
 
 void downlinkLED(const uint16_t *payload, size_t size, port_t port){
   
-  if (payload == (mustWeSendData(falls, distance)== true) ){
+  if (payload [0] ==  mustWeSendData(falls, distance, presence) ){
     digitalWrite(LED_BLUE, HIGH);
     }else{
     digitalWrite(LED_BLUE, LOW);
       }
 
- Serial.print("Received " + String(size) + " bytes on port " + String(port) + ":");
+ debugSerial.print("Received " + String(size) + " bytes on port " + String(port) + ":");
 }
-
