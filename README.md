@@ -19,3 +19,6 @@ FSR400 (Force Sensitive Resistor)
 Adafruit_LIS3DH - Displacement/Vibration Sensor
 https://github.com/adafruit/Adafruit_LIS3DH
 
+
+LoraModule 32u4II - datasheet
+https://docs.bsfrance.fr/documentation/11355_LORA32U4II/Datasheet_LoRa32u4II_1.1.pdf
