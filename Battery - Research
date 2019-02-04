@@ -1,0 +1,8 @@
+Battery Usage
+
+Radio Power Draw from LoRa 32u4
+https://learn.adafruit.com/adafruit-feather-32u4-radio-with-lora-radio-module/power-management
+
+LoRa paper on Battery consumption https://www.theseus.fi/bitstream/handle/10024/146549/Peura_Ukko-Pekka.pdf?sequence=1&isAllowed=y
+
+GPS Tracker https://github.com/ttn-muc/Leonardo-LoRa-gpstrack
