@@ -2,8 +2,9 @@
 #include <HCSR04.h>
 #include "SparkFunLSM6DS3.h"
 #include "Wire.h"
+#include <Sodaq_wdt.h>
 #define debugSerial SerialUSB
-#define loraSerial Serial2
+#define loraSerial Serial1
 #define DEBUG 1
 
 
@@ -20,7 +21,7 @@ const uint8_t AppKey[16] = { 0x98, 0x42, 0xC1, 0x9F, 0x65, 0xB9, 0x8B, 0xDB, 0x5
 
 /*
  Free Fall detector preset
- (Arduino Leonardo SDA SCL)
+
  
 */
 
@@ -79,8 +80,6 @@ void setup()
   LoRaBee.setDiag(debugSerial); // to use debug remove //DEBUG inside library
   LoRaBee.init(loraSerial, LORA_RESET);
 
- 
-  setupLoRa();
 
 // Starting the accelerometer
   if( lsm6ds3.begin() != 0 ){
@@ -231,7 +230,7 @@ bool RiderPresent(void) {
 /*
   Bytes to be sent
 */
-      uint16_t falls = Freefallcounter();
+      uint16_t falls = Freefallcounter(true);
       uint8_t distance = senseDistance();
       uint8_t presence = RiderPresent();
 
@@ -240,14 +239,14 @@ void doSend(uint16_t falls, uint8_t distance, uint8_t presence ) {
  
   if(Freefallcounter(true) && RiderPresent() == true){
   
-  uint32_t bytesToSend[];                  
+  byte bytesToSend[4];                  
 
   bytesToSend[0] = distance;          // Distance Byte
   bytesToSend[1] = falls >> 8;       // High byte Accelerometer
   bytesToSend[2] = falls;           // Low Byte Accelerometer
   bytesToSend[3] = presence;       //Rider is present
   
-  LoRaBee.send(1, bytesToSend, 5)
+  LoRaBee.send(1, bytesToSend, 5);
 
   delay(3000);
   }else{
